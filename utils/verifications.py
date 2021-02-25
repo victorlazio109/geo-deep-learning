@@ -29,9 +29,9 @@ def validate_num_classes(vector_file: Union[str, Path], num_classes: int, attrib
 
     detected_classes = len(distinct_att) - len([ignore_index]) if ignore_index in distinct_att else len(distinct_att)
 
-    if detected_classes != num_classes:
-        raise ValueError('The number of classes in the yaml.config {} is different than the number of classes in '
-                         'the file {} {}'.format(num_classes, vector_file, str(list(distinct_att))))
+    # if detected_classes != num_classes:
+    #     raise ValueError('The number of classes in the yaml.config {} is different than the number of classes in '
+    #                      'the file {} {}'.format(num_classes, vector_file, str(list(distinct_att))))
 
     return distinct_att
 

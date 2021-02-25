@@ -12,7 +12,7 @@ from tqdm import tqdm
 from utils.optimizer import create_optimizer
 from losses import MultiClassCriterion
 import torch.optim as optim
-from models import TernausNet, unet, checkpointed_unet, unet_context, inception, coordconv
+from models import TernausNet, unet, checkpointed_unet, RNet, inception, coordconv, common
 from utils.utils import load_from_checkpoint, get_device_ids, get_key_def
 
 
@@ -74,6 +74,8 @@ def set_hyperparameters(params, num_classes, model, checkpoint, dontcare_val):
                                     ignore_index=dontcare_val,
                                     weight=class_weights)
 
+    # criterion = SingleClassCriterion(loss_type=params['training']['loss_fn'],)
+
     # Optimizer
     opt_fn = params['training']['optimizer']
     optimizer = create_optimizer(params=model.parameters(), mode=opt_fn, base_lr=lr, weight_decay=weight_decay)
@@ -123,6 +125,13 @@ def net(net_params, num_channels, inference=False):
         assert num_bands == 3, msg
         model = models.segmentation.fcn_resnet101(pretrained=False, progress=True, num_classes=num_channels,
                                                   aux_loss=None)
+    elif model_name == 'deeplabv3_resnet101_master':
+        assert (num_bands == 3 or num_bands == 4), msg
+        if num_bands == 3:
+            print('Finetuning pretrained deeplabv3 with 3 bands')
+            model = models.segmentation.deeplabv3_resnet101(pretrained=True, progress=True, aux_loss=None)
+            model.classifier = common.DeepLabHead(2048, num_channels)
+            
     elif model_name == 'deeplabv3_resnet101':
         assert (num_bands == 3 or num_bands == 4), msg
         if num_bands == 3:
@@ -201,8 +210,8 @@ def net(net_params, num_channels, inference=False):
             in_channels=num_bands,
             classes=num_channels,
             activation=None)
-    elif model_name == 'unet_context':
-        model = unet_context.ContextualUnet(num_bands, num_channels)
+    elif model_name == 'r_net':
+        model = RNet.RNet(num_bands, num_channels)
 
     else:
         raise ValueError(f'The model name {model_name} in the config.yaml is not defined.')

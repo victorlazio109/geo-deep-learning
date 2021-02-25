@@ -112,6 +112,7 @@ def vis(params, input_, output, vis_path, sample_num=0, label=None, dataset='', 
     if not inference:  # FIXME: function parameters should not come in as different types if inference or not.
         input_ = input_.cpu().permute(1, 2, 0).numpy()  # channels last
         output = F.softmax(output, dim=0)  # Inference output is already softmax
+        # output = F.sigmoid(output)
         output = output.detach().cpu().permute(1, 2, 0).numpy()  # channels last
         if label is not None:
             label_copy = label.cpu().numpy().copy()

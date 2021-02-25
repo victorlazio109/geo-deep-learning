@@ -17,6 +17,7 @@ except ModuleNotFoundError:
     warnings.warn(f"The python Nvidia management library could not be imported. Ignore if running on CPU only.")
 
 import torch.optim as optim
+import torch.nn.functional as F
 from torch.utils.data import DataLoader
 from PIL import Image
 from sklearn.utils import compute_sample_weight
@@ -145,7 +146,8 @@ def get_num_samples(samples_path, params):
                     for x in range(num_samples[i]):
                         label = hdf5_file['map_img'][x]
                         label = np.where(label == 255, 0, label)
-                        unique_labels = np.unique(label)
+                        unique_labels, _ = np.unique(label, return_counts=True)
+                        # print('class:', unique_labels, 'count:', _)
                         weights.append(''.join([str(int(i)) for i in unique_labels]))
                         samples_weight = compute_sample_weight('balanced', weights)
 
@@ -217,8 +219,11 @@ def vis_from_dataloader(params, eval_loader, model, ep_num, output_path, dataset
                     labels = data['map_img'].to(device)
 
                     outputs = model(inputs)
+                    print('label_vals_vis', np.unique(labels.detach().cpu().numpy()))
+                    print('out_vals_vis', np.unique(outputs[0].argmax(dim=0).detach().cpu().numpy()))
                     if isinstance(outputs, OrderedDict):
                         outputs = outputs['out']
+                        print('out_vals_vis_dict', np.unique(outputs[0].argmax(dim=0).detach().cpu().numpy()))
 
                     vis_from_batch(params, inputs, outputs,
                                    batch_index=batch_index,
@@ -270,6 +275,8 @@ def train(train_loader,
 
             inputs = data['sat_img'].to(device)
             labels = data['map_img'].to(device)
+            l_skel = data['skel_img'].to(device)
+            # print('l_skel', np.unique(l_skel.detach().cpu().numpy()))
 
             if inputs.shape[1] == 4 and any("module.modelNIR" in s for s in model.state_dict().keys()):
                 ############################
@@ -305,10 +312,21 @@ def train(train_loader,
                                    labels=labels,
                                    dataset='trn',
                                    ep_num=ep_idx+1)
+            # outputs = outputs.argmax(dim=1).float()
+            # print('outputs_shape', outputs.shape, 'outputs_type', outputs.type())
+            # print('labels_shape', labels.shape, 'labels_type', labels.type())
+            # print(num_classes)
+            #
+            # labels = F.one_hot(labels, num_classes).permute(0, 3, 1, 2)
+            #
+            # print('outputs_shape', outputs.shape, 'outputs_type', outputs.type())
+            # print('labels_shape', labels.shape, 'labels_type', labels.type())
 
-            loss = criterion(outputs, labels)
+            loss = criterion(outputs, labels, l_skel)
 
             train_metrics['loss'].update(loss.item(), batch_size)
+            print('label_vals', np.unique(labels.detach().cpu().numpy()))
+            print('out_vals', np.unique(outputs[0].argmax(dim=0).detach().cpu().numpy()))
 
             if device.type == 'cuda' and debug:
                 res, mem = gpu_stats(device=device.index)
@@ -357,6 +375,7 @@ def evaluation(eval_loader, model, criterion, num_classes, batch_size, ep_idx, p
             with torch.no_grad():
                 inputs = data['sat_img'].to(device)
                 labels = data['map_img'].to(device)
+                l_skel = data['skel_img'].to(device)
                 labels_flatten = flatten_labels(labels)
 
                 if inputs.shape[1] == 4 and any("module.modelNIR" in s for s in model.state_dict().keys()):
@@ -392,8 +411,10 @@ def evaluation(eval_loader, model, criterion, num_classes, batch_size, ep_idx, p
                                        ep_num=ep_idx+1)
 
                 outputs_flatten = flatten_outputs(outputs, num_classes)
+                # labels = F.one_hot(labels, num_classes).permute(0, 3, 1, 2)
 
-                loss = criterion(outputs, labels)
+                # loss = criterion(outputs, labels)
+                loss = criterion(outputs, labels, l_skel)
 
                 eval_metrics['loss'].update(loss.item(), batch_size)
 

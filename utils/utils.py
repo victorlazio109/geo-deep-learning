@@ -1,4 +1,5 @@
 import csv
+import cv2
 import numbers
 from pathlib import Path
 from typing import Sequence, List
@@ -65,7 +66,7 @@ def load_from_checkpoint(checkpoint, model, optimizer=None):
     model.load_state_dict(checkpoint['model'], strict=False)
     print(f"=> loaded model\n")
     if optimizer and 'optimizer' in checkpoint.keys():    # 2nd condition if loading a model without optimizer
-        optimizer.load_state_dict(checkpoint['optimizer'], strict=False)
+        optimizer.load_state_dict(checkpoint['optimizer'])
     return model, optimizer
 
 
@@ -157,7 +158,6 @@ def get_key_def(key, config, default=None, msg=None, delete=False, expected_type
                 del config[key]
     return val
 
-
 def minmax_scale(img, scale_range=(0, 1), orig_range=(0, 255)):
     """
     scale data values from original range to specified range
@@ -231,10 +231,10 @@ def pad(img, padding, fill=0):
     return img
 
 
-def pad_diff(actual_height, actual_width, desired_shape):
+def pad_diff(actual_height, actual_width, desired_height, desired_width):
     """ Pads img_arr width or height < samples_size with zeros """
-    h_diff = desired_shape - actual_height
-    w_diff = desired_shape - actual_width
+    h_diff = desired_height - actual_height
+    w_diff = desired_width - actual_width
     padding = (0, 0, w_diff, h_diff)  # left, top, right, bottom
     return padding
 
@@ -269,6 +269,7 @@ def ind2rgb(arr, color):
         for ch in range(3):
           rgb[..., ch][arr == cl] = (color[cl][ch])
     return rgb
+
 
 def list_input_images(img_dir_or_csv: str,
                       bucket_name: str = None,
@@ -382,6 +383,8 @@ def add_metadata_from_raster_to_sample(sat_img_arr: np.ndarray,
 
 #### Image Patches Smoothing Functions ####
 """ Adapted from : https://github.com/Vooban/Smoothly-Blend-Image-Patches  """
+
+
 def _spline_window(window_size, power=2):
     """
     Squared spline (power=2) window function:
@@ -416,9 +419,43 @@ def _window_2D(window_size, power=2):
         wind = _spline_window(window_size, power)
         wind = np.expand_dims(np.expand_dims(wind, 1), -1)
         wind = wind * wind.transpose(1, 0, 2)
-        # wind = wind.squeeze()
-        # plt.imshow(wind[:, :, 0], cmap="viridis")
-        # plt.title("2D Windowing Function for a Smooth Blending of Overlapping Patches")
-        # plt.show()
         cached_2d_windows[key] = wind
     return wind
+
+
+#### Split image with overlap ####
+""" Code modified from: https://github.com/Devyanshu/image-split-with-overlap """
+
+
+def start_points(size, split_size, overlap=0):
+    points = [0]
+    stride = int(split_size * (1 - (overlap / 100)))
+    counter = 1
+    while True:
+        pt = stride * counter
+        if pt + split_size >= size:
+            points.append(size - split_size)
+            break
+        else:
+            points.append(pt)
+        counter += 1
+    return points
+
+
+def opencv_skelitonize(img):
+    skel = np.zeros(img.shape, np.uint8)
+    img = img.astype(np.uint8)
+    size = np.size(img)
+    element = cv2.getStructuringElement(cv2.MORPH_CROSS, (5, 5))
+    done = False
+    while (not done):
+        eroded = cv2.erode(img, element)
+        temp = cv2.dilate(eroded, element)
+        temp = cv2.subtract(img, temp)
+        skel = cv2.bitwise_or(skel, temp)
+        img = eroded.copy()
+        zeros = size - cv2.countNonZero(img)
+        if zeros == size:
+            done = True
+    skel = skel[:, :, np.newaxis].astype(np.uint8)
+    return skel

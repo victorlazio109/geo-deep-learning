@@ -7,6 +7,7 @@ from .lovasz_loss import LovaszSoftmax
 from .ohem_loss import OhemCrossEntropy2d
 from .focal_loss import FocalLoss
 from .dice_loss import DiceLoss
+from .clDice_loss import clDiceLoss
 from .boundary_loss import BoundaryLoss
 
 
@@ -23,6 +24,8 @@ class MultiClassCriterion(nn.Module):
             self.criterion = FocalLoss(**kwargs)
         elif loss_type == 'Dice':
             self.criterion = DiceLoss(**kwargs)
+        elif loss_type == 'clDice':
+            self.criterion = clDiceLoss(**kwargs)
         elif loss_type == 'BF1':
             self.criterion = BoundaryLoss(**kwargs)
         elif loss_type == 'Duo':
@@ -32,7 +35,7 @@ class MultiClassCriterion(nn.Module):
             raise NotImplementedError\
                 (f'Current version of geo-deep-learning does not implement {loss_type} loss')
 
-    def forward(self, preds, labels):
+    def forward(self, preds, labels, label_skeleton=None):
         # preds = F.interpolate(preds, labels.shape[1:], mode='bilinear', align_corners=True)
         if isinstance(self.criterion, list):
             cals = []
@@ -40,5 +43,5 @@ class MultiClassCriterion(nn.Module):
                 cals.append(obj(preds, labels))
             loss = sum(cals)
         else:
-            loss = self.criterion(preds, labels)
+            loss = self.criterion(preds, labels, label_skeleton)
         return loss

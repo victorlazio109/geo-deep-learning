@@ -33,6 +33,8 @@ def create_files_and_datasets(params, samples_folder):
                                  maxshape=(None, samples_size, samples_size, real_num_bands))
         hdf5_file.create_dataset("map_img", (0, samples_size, samples_size), np.int16,
                                  maxshape=(None, samples_size, samples_size))
+        hdf5_file.create_dataset("skel_img", (0, samples_size, samples_size), np.int16,
+                                 maxshape=(None, samples_size, samples_size))
         hdf5_file.create_dataset("meta_idx", (0, 1), dtype=np.int16, maxshape=(None, 1))
         try:
             hdf5_file.create_dataset("metadata", (0, 1), dtype=h5py.string_dtype(), maxshape=(None, 1))
@@ -102,6 +104,7 @@ class SegmentationDataset(Dataset):
             #if self.num_bands < sat_img.shape[-1]:  # FIXME: remove after NIR integration tests
             #    sat_img = sat_img[:, :, :self.num_bands]
             map_img = self._remap_labels(hdf5_file["map_img"][index, ...])
+            skel_img = self._remap_labels(hdf5_file["skel_img"][index, ...])
             meta_idx = int(hdf5_file["meta_idx"][index])
             metadata = self.metadata[meta_idx]
             sample_metadata = eval(hdf5_file["sample_metadata"][index, ...][0])
@@ -113,6 +116,7 @@ class SegmentationDataset(Dataset):
             # where bandwise array has no data values, set as np.nan
             # sat_img[sat_img == metadata['nodata']] = np.nan # TODO: problem with lack of dynamic range. See: https://rasterio.readthedocs.io/en/latest/topics/masks.html
         sample = {"sat_img": sat_img, "map_img": map_img, "metadata": metadata,
+                  "skel_img": skel_img,
                   "hdf5_path": self.hdf5_path}
 
         if self.radiom_transform:  # radiometric transforms should always precede geometric ones

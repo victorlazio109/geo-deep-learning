@@ -325,8 +325,8 @@ def train(train_loader,
             loss = criterion(outputs, labels, l_skel)
 
             train_metrics['loss'].update(loss.item(), batch_size)
-            print('label_vals', np.unique(labels.detach().cpu().numpy()))
-            print('out_vals', np.unique(outputs[0].argmax(dim=0).detach().cpu().numpy()))
+            # print('label_vals', np.unique(labels.detach().cpu().numpy()))
+            # print('out_vals', np.unique(outputs[0].argmax(dim=0).detach().cpu().numpy()))
 
             if device.type == 'cuda' and debug:
                 res, mem = gpu_stats(device=device.index)

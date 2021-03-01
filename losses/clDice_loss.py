@@ -3,12 +3,13 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-def soft_skeletonize(x, thresh_width=10):
+@torch.jit.script
+def soft_skeletonize(x):
     '''
     Differenciable aproximation of morphological skelitonization operaton
     thresh_width - maximal expected width of vessel
     '''
-    for i in range(thresh_width):
+    for i in range(10):
         min_pool_x = torch.nn.functional.max_pool2d(x * -1, (3, 3), 1, 1) * -1
         contour = torch.nn.functional.relu(torch.nn.functional.max_pool2d(min_pool_x, (3, 3), 1, 1) - min_pool_x)
         x = torch.nn.functional.relu(x - contour)

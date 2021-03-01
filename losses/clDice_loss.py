@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-def soft_skeletonize(x, thresh_width=11):
+def soft_skeletonize(x, thresh_width=10):
     '''
     Differenciable aproximation of morphological skelitonization operaton
     thresh_width - maximal expected width of vessel

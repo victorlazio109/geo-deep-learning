@@ -35,7 +35,7 @@ class MultiClassCriterion(nn.Module):
             raise NotImplementedError\
                 (f'Current version of geo-deep-learning does not implement {loss_type} loss')
 
-    def forward(self, preds, labels, label_skeleton=None):
+    def forward(self, preds, labels, label_skeleton=None, pred_seg=None):
         # preds = F.interpolate(preds, labels.shape[1:], mode='bilinear', align_corners=True)
         if isinstance(self.criterion, list):
             cals = []
@@ -43,5 +43,5 @@ class MultiClassCriterion(nn.Module):
                 cals.append(obj(preds, labels))
             loss = sum(cals)
         else:
-            loss = self.criterion(preds, labels, label_skeleton)
+            loss = self.criterion(preds, labels, label_skeleton, pred_seg)
         return loss

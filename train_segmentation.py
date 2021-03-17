@@ -218,7 +218,7 @@ def vis_from_dataloader(params, eval_loader, model, ep_num, output_path, dataset
                     inputs = data['sat_img'].to(device)
                     labels = data['map_img'].to(device)
 
-                    outputs = model(inputs)
+                    outputs, _ = model(inputs)
                     print('label_vals_vis', np.unique(labels.detach().cpu().numpy()))
                     print('out_vals_vis', np.unique(outputs[0].argmax(dim=0).detach().cpu().numpy()))
                     if isinstance(outputs, OrderedDict):
@@ -294,7 +294,7 @@ def train(train_loader,
 
             # forward
             optimizer.zero_grad()
-            outputs = model(inputs)
+            outputs, outputs_seg = model(inputs)
             # added for torchvision models that output an OrderedDict with outputs in 'out' key.
             # More info: https://pytorch.org/hub/pytorch_vision_deeplabv3_resnet101/
             if isinstance(outputs, OrderedDict):
@@ -322,7 +322,7 @@ def train(train_loader,
             # print('outputs_shape', outputs.shape, 'outputs_type', outputs.type())
             # print('labels_shape', labels.shape, 'labels_type', labels.type())
 
-            loss = criterion(outputs, labels, l_skel)
+            loss = criterion(outputs, labels, l_skel, outputs_seg)
 
             train_metrics['loss'].update(loss.item(), batch_size)
             # print('label_vals', np.unique(labels.detach().cpu().numpy()))
@@ -392,7 +392,7 @@ def evaluation(eval_loader, model, criterion, num_classes, batch_size, ep_idx, p
                     # Test Implementation of the NIR
                     ############################
 
-                outputs = model(inputs)
+                outputs, outputs_seg = model(inputs)
                 if isinstance(outputs, OrderedDict):
                     outputs = outputs['out']
 
@@ -414,7 +414,7 @@ def evaluation(eval_loader, model, criterion, num_classes, batch_size, ep_idx, p
                 # labels = F.one_hot(labels, num_classes).permute(0, 3, 1, 2)
 
                 # loss = criterion(outputs, labels)
-                loss = criterion(outputs, labels, l_skel)
+                loss = criterion(outputs, labels, l_skel, outputs_seg)
 
                 eval_metrics['loss'].update(loss.item(), batch_size)
 

@@ -126,11 +126,12 @@ def vector_to_raster(vector_file, input_image, out_shape, attribute_name, fill=0
                                merge_all=merge_all)
 
     if merge_all:
-        return rasterio.features.rasterize([v for vecs in lst_vector_tuple.values() for v in vecs],
-                                           fill=fill,
-                                           out_shape=out_shape,
-                                           transform=input_image.transform,
-                                           dtype=np.int16)
+        if lst_vector_tuple:
+            return rasterio.features.rasterize([v for vecs in lst_vector_tuple.values() for v in vecs],
+                                               fill=fill,
+                                               out_shape=out_shape,
+                                               transform=input_image.transform,
+                                               dtype=np.int16)
     else:
         burned_rasters = [rasterio.features.rasterize(lst_vector_tuple[id],
                                                       fill=fill,

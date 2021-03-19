@@ -429,6 +429,9 @@ def main(params):
                                                        merge_all=True,
                                                        )  # background value in rasterized vector.
 
+                    if np_label_raster is None:
+                        continue
+
                     # if dataset_nodata is not None:
                         # 3. Set ignore_index value in label array where nodata in raster (only if nodata across all bands)
                     # np_label_raster[dataset_nodata] = dontcare

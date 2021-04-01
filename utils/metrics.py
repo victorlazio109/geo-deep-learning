@@ -1,6 +1,5 @@
 import numpy as np
-from sklearn.metrics import classification_report, matthews_corrcoef, recall_score
-from math import sqrt
+from sklearn.metrics import classification_report
 
 min_val = 1e-6
 def create_metrics_dict(num_classes):
@@ -116,9 +115,6 @@ class ComputePixelMetrics():
         for i in range(self.num_classes):
             c_label = self.label == i
             c_pred = self.pred == i
-            # if c_label.sum() == 0 and c_pred.sum() == 0:
-            #     classes.append(np.nan)
-            # else:
             m = metric_func(c_label, c_pred)
             classes.append(m)
             metric[metric_func.__name__ + '_' + str(i)] = classes[i]
@@ -147,46 +143,3 @@ class ComputePixelMetrics():
         dice = (2 * intersection) / ((label.sum()) + (pred.sum()))
 
         return dice
-
-    @staticmethod
-    def precision(label, pred):
-        '''
-        :return: precision
-        '''
-        tp = int(np.sum(np.logical_and(label, pred)))
-        fp = int(np.sum(np.logical_and(pred, np.logical_not(label))))
-        p = (tp + min_val) / (tp + fp + min_val)
-
-        return p
-
-    @staticmethod
-    def recall(label, pred):
-        '''
-        :return: recall
-        '''
-        tp = int(np.sum(np.logical_and(label, pred)))
-        fn = int(np.sum(np.logical_and(label, np.logical_not(pred))))
-        r = (tp + min_val) / (tp + fn + min_val)
-
-        return r
-
-    @staticmethod
-    def matthews(label, pred):
-        '''
-        :return: Matthews correlation coefficient
-        '''
-        tp = int(np.sum(np.logical_and(label, pred)))
-        fp = int(np.sum(np.logical_and(pred, np.logical_not(label))))
-        tn = int(np.sum(np.logical_and(np.logical_not(label), np.logical_not(pred))))
-        fn = int(np.sum(np.logical_and(label, np.logical_not(pred))))
-        mcc = (tp * tn - fp * fn) / (sqrt((tp + fp) * (tp + fn) * (tn + fp) * (tn + fn)))
-
-        return mcc
-
-    @staticmethod
-    def accuracy(label, pred):
-        '''
-        :return: accuracy
-        '''
-        acc = np.mean(pred == label)
-        return acc

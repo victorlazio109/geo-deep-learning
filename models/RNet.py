@@ -21,7 +21,7 @@ def initialize_weights(*models):
     for model in models:
         for module in model.modules():
             if isinstance(module, nn.Conv2d) or isinstance(module, nn.Linear):
-                nn.init.kaiming_normal(module.weight)
+                nn.init.kaiming_normal_(module.weight)
                 if module.bias is not None:
                     module.bias.data.zero_()
             elif isinstance(module, nn.BatchNorm2d):
@@ -77,7 +77,7 @@ class RefUnet(nn.Module):
 
         self.conv_d0 = nn.Conv2d(16, 1, 3, padding=1)
 
-        self.upscore2 = nn.Upsample(scale_factor=2, mode='bilinear')
+        self.upscore2 = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=False)
 
     def forward(self, x):
         hx = x
@@ -112,31 +112,6 @@ class RefUnet(nn.Module):
 class RNet(nn.Module):
     def __init__(self, num_bands, num_classes, inference=None):
         super().__init__()
-
-        # self.encoder = smp.encoders.get_encoder('resnet18', in_channels=num_bands, depth=5, weights=None)
-        # self.head = nn.Sequential(nn.Conv2d(512, 128, kernel_size=1, stride=1, padding=0, bias=False),
-        #                           nn.BatchNorm2d(128),
-        #                           nn.ReLU())
-        # self.dec = nn.Sequential(nn.ConvTranspose2d(in_channels=128, out_channels=128, kernel_size=2, stride=2),
-        #                          nn.BatchNorm2d(128, momentum=BN_MOMENTUM), nn.ReLU(),
-        #                          nn.ConvTranspose2d(in_channels=128, out_channels=64, kernel_size=2, stride=2),
-        #                          nn.BatchNorm2d(64, momentum=BN_MOMENTUM), nn.ReLU(),
-        #                          nn.ConvTranspose2d(in_channels=64, out_channels=32, kernel_size=2, stride=2),
-        #                          nn.BatchNorm2d(32, momentum=BN_MOMENTUM), nn.ReLU(),
-        #                          nn.ConvTranspose2d(in_channels=32, out_channels=16, kernel_size=2, stride=2),
-        #                          nn.BatchNorm2d(16, momentum=BN_MOMENTUM), nn.ReLU(),
-        #                          nn.ConvTranspose2d(in_channels=16, out_channels=16, kernel_size=2, stride=2),
-        #                          nn.BatchNorm2d(16, momentum=BN_MOMENTUM), nn.ReLU())
-        # self.clf = nn.Conv2d(16, num_classes, kernel_size=1)
-        # self.ctx = nn.Sequential(dilated_conv(n_convs=2, in_channels=num_classes, out_channels=num_classes, dilation=1),
-        #                          dilated_conv(n_convs=1, in_channels=num_classes, out_channels=num_classes, dilation=2),
-        #                          dilated_conv(n_convs=1, in_channels=num_classes, out_channels=num_classes, dilation=4),
-        #                          dilated_conv(n_convs=1, in_channels=num_classes, out_channels=num_classes, dilation=8),
-        #                          dilated_conv(n_convs=1, in_channels=num_classes, out_channels=num_classes,
-        #                                       dilation=16),
-        #                          dilated_conv(n_convs=1, in_channels=num_classes, out_channels=num_classes, dilation=1),
-        #                          nn.Conv2d(num_classes, num_classes, kernel_size=1, padding=0))
-        #
         self.inference = inference
         resnet = models.resnet18(pretrained=True)
         newconv1 = nn.Conv2d(num_bands, 64, kernel_size=7, stride=2, padding=3, bias=False)
@@ -176,12 +151,7 @@ class RNet(nn.Module):
         initialize_weights(self.dec, self.clf, self.ctx, self.Ref)
 
     def forward(self, x):
-        # x_enc = self.encoder(x)
-        # x_h = self.head(x_enc[-1])
-        # x_d = self.dec(x_h)
-        # x_c = self.clf(x_d)
-        # x_out = self.ctx(x_c)
-        x_size = x.size()
+        # x_size = x.size()
         x = self.layer0(x)  # scale:1/2, 32
         x = self.layer1(x)  # scale:1/2, 64
         x = self.layer2(x)  # scale:1/4, 128
@@ -199,6 +169,99 @@ class RNet(nn.Module):
         else:
             return out_rf, out_seg
 
+
+class RNet50_WRN(nn.Module):
+    def __init__(self, num_bands, num_classes, inference=None):
+        super().__init__()
+        self.inference = inference
+        resnet = models.wide_resnet50_2(pretrained=True)
+        newconv1 = nn.Conv2d(num_bands, 64, kernel_size=7, stride=2, padding=3, bias=False)
+        if num_bands > 3:
+            newconv1.weight.data[:, 3:num_bands, :, :].copy_(resnet.conv1.weight.data[:, 0:num_bands - 3, :, :])
+        else:
+            newconv1.weight.data[:, 0:num_bands, :, :].copy_(resnet.conv1.weight.data[:, 0:num_bands, :, :])
+
+        self.layer0 = nn.Sequential(newconv1, resnet.bn1, resnet.relu)
+        self.layer1 = resnet.layer1
+        self.layer2 = resnet.layer2
+        self.layer3 = resnet.layer3
+        self.layer4 = resnet.layer4
+        # self.head = nn.Sequential(nn.Conv2d(2048, 512, kernel_size=1, stride=1, padding=0, bias=False),
+        #                           nn.BatchNorm2d(512, momentum=0.95),
+        #                           nn.ReLU())
+        # self.dec = nn.Sequential(nn.ConvTranspose2d(in_channels=512, out_channels=256, kernel_size=2, stride=2),
+        #                          nn.BatchNorm2d(256, momentum=0.01), nn.ReLU(),
+        #                          nn.ConvTranspose2d(in_channels=256, out_channels=128, kernel_size=2, stride=2),
+        #                          nn.BatchNorm2d(128, momentum=0.01), nn.ReLU(),
+        #                          nn.ConvTranspose2d(in_channels=128, out_channels=64, kernel_size=2, stride=2),
+        #                          nn.BatchNorm2d(64, momentum=0.01), nn.ReLU(),
+        #                          nn.ConvTranspose2d(in_channels=64, out_channels=16, kernel_size=2, stride=2),
+        #                          nn.BatchNorm2d(16, momentum=0.01), nn.ReLU(),)
+        # nn.ConvTranspose2d(in_channels=32, out_channels=16, kernel_size=2, stride=2),
+        # nn.BatchNorm2d(16, momentum=0.01), nn.ReLU())
+
+        # self.head = nn.Sequential(nn.BatchNorm2d(2048, momentum=0.95),
+        #                           nn.ReLU(),
+        #                           nn.Conv2d(2048, 1024, kernel_size=1, stride=1, padding=0, bias=False))
+
+        self.dec = nn.Sequential(nn.BatchNorm2d(2048, momentum=0.01),
+                                 nn.ReLU(),
+                                 nn.ConvTranspose2d(in_channels=2048, out_channels=1024, kernel_size=2, stride=2),
+
+                                 nn.BatchNorm2d(1024, momentum=0.01),
+                                 nn.ReLU(),
+                                 nn.ConvTranspose2d(in_channels=1024, out_channels=512, kernel_size=2, stride=2),
+
+                                 nn.BatchNorm2d(512, momentum=0.01),
+                                 nn.ReLU(),
+                                 nn.ConvTranspose2d(in_channels=512, out_channels=256, kernel_size=2, stride=2),
+
+                                 nn.BatchNorm2d(256, momentum=0.01),
+                                 nn.ReLU(),
+                                 nn.ConvTranspose2d(in_channels=256, out_channels=64, kernel_size=2, stride=2), )
+
+        # nn.BatchNorm2d(32, momentum=0.01),
+        # nn.ReLU(),
+        # nn.ConvTranspose2d(in_channels=32, out_channels=16, kernel_size=2, stride=2))
+
+        self.ctx = nn.Sequential(dilated_conv(n_convs=2, in_channels=64, out_channels=64, dilation=1),
+                                 dilated_conv(n_convs=1, in_channels=64, out_channels=64, dilation=2),
+                                 dilated_conv(n_convs=1, in_channels=64, out_channels=64, dilation=4),
+                                 dilated_conv(n_convs=1, in_channels=64, out_channels=64, dilation=8),
+                                 dilated_conv(n_convs=1, in_channels=64, out_channels=64,
+                                              dilation=16),
+                                 dilated_conv(n_convs=1, in_channels=64, out_channels=64, dilation=1))
+
+        self.clf = nn.Conv2d(64, num_classes, kernel_size=1)
+
+        self.Ref = RefUnet(num_classes)
+
+        initialize_weights(self.dec, self.clf, self.ctx, self.Ref)
+
+    def forward(self, x):
+        x = self.layer0(x)  # scale:1/2, 32
+        # print(x.size())
+        x = self.layer1(x)  # scale:1/2, 64
+        # print(x.size())
+        x = self.layer2(x)  # scale:1/4, 128
+        # print(x.size())
+        x = self.layer3(x)  # scale:1/8, 256
+        # print(x.size())
+        x = self.layer4(x)  # scale:1/8, 512
+        # print(x.size())
+        # x = self.head(x)
+        # print(x.size())
+
+        out = self.dec(x)
+        # print(out.shape)
+        out = self.ctx(out)
+        # out = F.interpolate(out, x_size[2:], mode='bilinear', align_corners=True)
+        out_seg = self.clf(out)
+        out_rf = self.Ref(out_seg)
+        if self.inference:
+            return out_rf
+        else:
+            return out_rf, out_seg
 # def dilated_conv(n_convs, in_channels, out_channels, dilation):
 #     layers = []
 #     for i in range(n_convs):

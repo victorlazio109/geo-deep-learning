@@ -481,7 +481,7 @@ def main(params, config_path):
     # # list of GPU devices that are available and unused. If no GPUs, returns empty list
     lst_device_ids = get_device_ids(num_devices) if torch.cuda.is_available() else []
     num_devices = len(lst_device_ids) if lst_device_ids else 0
-    device = torch.device(f'cuda:{lst_device_ids[0]}' if torch.cuda.is_available() and lst_device_ids else 'cpu')
+    device = torch.device(f'cuda' if torch.cuda.is_available() and lst_device_ids else 'cpu')
 
     tqdm.write(f'Creating dataloaders from data in {samples_folder}...\n')
     trn_dataloader, val_dataloader, tst_dataloader = create_dataloader(samples_folder=samples_folder,

@@ -17,7 +17,7 @@ import pandas as pd
 import geopandas as gpd
 
 from tqdm import tqdm
-from shapely.geometry import Polygon, box
+from shapely.geometry import Polygon
 from pathlib import Path
 from utils.metrics import ComputePixelMetrics
 from models.model_choice import net, load_checkpoint
@@ -59,9 +59,15 @@ def segmentation(img_array, input_image, label_arr, num_classes, gpkg_name, mode
 
     xres, yres = (abs(input_image.transform.a), abs(input_image.transform.e))
     h, w, bands = img_array.shape
-    assert num_bands <= bands, f"Num of specified bands is not compatible with image shape {img_array.shape}"
+    # assert num_bands <= bands, f"Num of specified bands is not compatible with image shape {img_array.shape}"
     if num_bands < bands:
+        warnings.warn(F"Num of specified bands {num_bands} is < image shape {img_array.shape}")
        img_array = img_array[:, :, :num_bands]
+    elif num_bands > bands:
+        warnings.warn(F" Num of specified bands {num_bands} is > image shape {img_array.shape} ")
+        for i in range(num_bands - bands):
+            o_band = img_array[:, :, 0:i]
+            img_array = np.append(img_array, o_band, axis=2)
     padding = int(round(sample_size * (1 - 1.0 / 2.0)))
     step = int(sample_size / 2.0)
     img_array = pad(img_array, padding=padding, fill=np.nan)
@@ -232,6 +238,7 @@ def main(params: dict):
     chunk_size = get_key_def('chunk_size', params['inference'], 512)
     num_classes = params['global']['num_classes']
     num_classes_corrected = add_background_to_num_class(task, num_classes)
+    # print(num_classes_corrected)
     num_bands = params['global']['number_of_bands']
     working_folder = Path(params['inference']['state_dict_path']).parent.joinpath(f'inference_{num_bands}bands')
     num_devices = params['global']['num_gpus'] if params['global']['num_gpus'] else 0
@@ -261,13 +268,16 @@ def main(params: dict):
         model.to(device)
 
     # mlflow tracking path + parameters logging
-    # set_tracking_uri(get_key_def('mlflow_uri', params['global'], default="./mlruns"))
-    # set_experiment('gdl-benchmarking/' + working_folder.name)
+    set_tracking_uri(get_key_def('mlflow_uri', params['global'], default="./mlruns"))
+    set_experiment('gdl_road-benchmarking/' + working_folder.name)
     # log_params(params['global'])
-    # log_params(params['inference'])
+    log_params(params['inference'])
 
     # CREATE LIST OF INPUT IMAGES FOR INFERENCE
-    list_img = list_input_images(img_dir_or_csv, bucket_name, glob_patterns=["*.tif", "*.TIF"])
+    list_img = list_input_images(img_dir_or_csv, bucket_name, glob_patterns=["*.tif", "*.TIF", "*.jp2",
+                                                                             "*.j2k", "*.jpf", "*.jpm",
+                                                                             "*.jpg2", "*.j2c", "*.jpc",
+                                                                             "*.jpx", "*.mj2"])
 
     if task == 'classification':
         classifier(params, list_img, model, device,
@@ -310,15 +320,26 @@ def main(params: dict):
                     label = None
                     if local_gpkg:
                         assert local_gpkg.is_file(), f"Could not locate gkpg file at {local_gpkg}"
-                        label = vector_to_raster(vector_file=local_gpkg,
+                        # label = vector_to_raster(vector_file=local_gpkg,
+                        #                          input_image=raster,
+                        #                          out_shape=(inf_meta['height'], inf_meta['width']),
+                        #                          attribute_name=info['attribute_name'],
+                        #                          fill=0)  # background value in rasterized vector.
+
+                        label = vector_to_raster(vector_file=info['gpkg'],
                                                  input_image=raster,
                                                  out_shape=(inf_meta['height'], inf_meta['width']),
                                                  attribute_name=info['attribute_name'],
-                                                 fill=0)  # background value in rasterized vector.
+                                                 fill=0,
+                                                 target_ids=[3, '3'],
+                                                 merge_all=True)  # background value in rasterized vector.
+
+                        label = np.where(label == 3, 1, label)
 
                     pred, gdf = segmentation(img_array, raster, label, num_classes_corrected,
                                              gpkg_name, model, chunk_size, num_bands, device)
                     if gdf is not None:
+                        # print('gdf is not none')
                         gdf_.append(gdf)
                         gpkg_name_.append(gpkg_name)
                     if local_gpkg:
@@ -376,3 +397,17 @@ if __name__ == '__main__':
         raise SystemExit
 
     main(params)
+
+    # pth_path = Path('/export/sata01/wspace/scaling_GDL/single_class/test_13_road/Rnet50/_2021-04-06_16-56/checkpoint.pth.tar')
+    # yaml_path = '/export/sata01/wspace/scaling_GDL/single_class/test_13_road/Rnet50/RGBN_test13_road_Rnet50.yaml'
+    #
+    # out_pth_path = pth_path.parent / f'checkpoint_params.pth.tar'
+    # checkpoint = load_checkpoint(pth_path)
+    # params = read_parameters(yaml_path)
+    # for key in checkpoint.keys():
+    #     print(key)
+    # torch.save({'epoch': checkpoint['epoch'],
+    #             'params': params,
+    #             'model': checkpoint['model'],
+    #             'best_loss': checkpoint['best_loss'],
+    #             'optimizer': checkpoint['optimizer']}, out_pth_path)

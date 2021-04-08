@@ -214,6 +214,8 @@ def net(net_params, num_channels, inference=False):
         model = RNet.RNet(num_bands, num_channels, inference)
     elif model_name == 'r_net50':
         model = RNet.RNet50_WRN(num_bands, num_channels, inference)
+    elif model_name == 'r_net32':
+        model = RNet.RNet_32(num_bands, num_channels, inference)
 
     else:
         raise ValueError(f'The model name {model_name} in the config.yaml is not defined.')

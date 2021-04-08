@@ -251,7 +251,7 @@ def unnormalize(input_img, mean, std):
 
 
 def BGR_to_RGB(array):
-    assert array.shape[2] >= 3, f"Not enough channels in array of shape {array.shape}"
+    # assert array.shape[2] >= 3, f"Not enough channels in array of shape {array.shape}"
     BGR_channels = array[..., :3]
     RGB_channels = np.ascontiguousarray(BGR_channels[..., ::-1])
     array[:, :, :3] = RGB_channels

@@ -62,7 +62,7 @@ def segmentation(img_array, input_image, label_arr, num_classes, gpkg_name, mode
     # assert num_bands <= bands, f"Num of specified bands is not compatible with image shape {img_array.shape}"
     if num_bands < bands:
         warnings.warn(F"Num of specified bands {num_bands} is < image shape {img_array.shape}")
-       img_array = img_array[:, :, :num_bands]
+        img_array = img_array[:, :, :num_bands]
     elif num_bands > bands:
         warnings.warn(F" Num of specified bands {num_bands} is > image shape {img_array.shape} ")
         for i in range(num_bands - bands):

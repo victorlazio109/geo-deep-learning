@@ -264,7 +264,7 @@ def main(params: dict):
         model.to(device)
     except RuntimeError:
         print(f"Unable to use device. Trying device 0")
-        device = torch.device(f'cuda:0' if torch.cuda.is_available() and lst_device_ids else 'cpu')
+        device = torch.device(f'cuda' if torch.cuda.is_available() and lst_device_ids else 'cpu')
         model.to(device)
 
     # mlflow tracking path + parameters logging
@@ -398,8 +398,8 @@ if __name__ == '__main__':
 
     main(params)
 
-    # pth_path = Path('/export/sata01/wspace/scaling_GDL/single_class/test_13_road/Rnet50/_2021-04-06_16-56/checkpoint.pth.tar')
-    # yaml_path = '/export/sata01/wspace/scaling_GDL/single_class/test_13_road/Rnet50/RGBN_test13_road_Rnet50.yaml'
+    # pth_path = Path('/export/sata01/wspace/scaling_GDL/single_class/test_13_road/Rnet32/_2021-04-08_16-04/checkpoint.pth.tar')
+    # yaml_path = '/export/sata01/wspace/scaling_GDL/single_class/test_13_road/Rnet32/_2021-04-08_16-04/RGBN_test13_road_Rnet32.yaml'
     #
     # out_pth_path = pth_path.parent / f'checkpoint_params.pth.tar'
     # checkpoint = load_checkpoint(pth_path)

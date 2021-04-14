@@ -65,7 +65,7 @@ class clDiceLoss(nn.Module):
         # print('cl_ouput_shape:', cl_output.shape, 'target_skeleton:', target_skeleton.shape)
         # print('output_shape:', output.shape, 'target_shape:', target.shape)
 
-        DL = self.dl(output_seg, target)
+        # DL = self.dl(output_seg, target)
         CE_S = self.ce(output_seg, target)
         CE = self.ce(output, target)
         bs = target.size(0)
@@ -112,8 +112,8 @@ class clDiceLoss(nn.Module):
         # loss *= mask.to(loss.dtype)
         CL = loss.mean()
 
-        # to_loss = (0.5 * (CE_S + CL)) + CE
-        to_loss = (0.5 * (DL + CL)) + CE
+        to_loss = (0.5 * (CE_S + CL)) + CE
+        # to_loss = (0.5 * (DL + CL)) + CE
         # to_loss = (0.4*DL + 0.6*CL) + CE
 
         return to_loss

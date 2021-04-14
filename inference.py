@@ -398,8 +398,8 @@ if __name__ == '__main__':
 
     main(params)
 
-    # pth_path = Path('/export/sata01/wspace/scaling_GDL/single_class/test_13_road/Rnet32/_2021-04-08_16-04/checkpoint.pth.tar')
-    # yaml_path = '/export/sata01/wspace/scaling_GDL/single_class/test_13_road/Rnet32/_2021-04-08_16-04/RGBN_test13_road_Rnet32.yaml'
+    # pth_path = Path('/export/sata01/wspace/scaling_GDL/single_class/test_13_road/Rnet32/_2021-04-13_17-26/checkpoint.pth.tar')
+    # yaml_path = '/export/sata01/wspace/scaling_GDL/single_class/test_13_road/Rnet32/_2021-04-13_17-26/RGBN_test13_road_Rnet32.yaml'
     #
     # out_pth_path = pth_path.parent / f'checkpoint_params.pth.tar'
     # checkpoint = load_checkpoint(pth_path)

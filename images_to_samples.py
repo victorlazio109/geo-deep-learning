@@ -12,7 +12,7 @@ from tqdm import tqdm
 from collections import OrderedDict
 
 from utils.CreateDataset import create_files_and_datasets
-from utils.utils import get_key_def, pad, pad_diff, read_csv, add_metadata_from_raster_to_sample, opencv_skelitonize
+from utils.utils import get_key_def, pad, pad_diff, read_csv, add_metadata_from_raster_to_sample
 from utils.geoutils import vector_to_raster
 from utils.readers import read_parameters, image_reader_as_array
 from utils.verifications import validate_num_classes, assert_num_bands, assert_crs_match, \
@@ -132,7 +132,6 @@ def add_to_datasets(dataset,
                     val_sample_file,
                     data,
                     target,
-                    skel,
                     sample_metadata,
                     metadata_idx,
                     dict_classes):
@@ -147,7 +146,6 @@ def add_to_datasets(dataset,
             samples_file = val_sample_file
     append_to_dataset(samples_file["sat_img"], data)
     append_to_dataset(samples_file["map_img"], target)
-    append_to_dataset(samples_file['skel_img'], skel)
     append_to_dataset(samples_file["sample_metadata"], repr(sample_metadata))
     append_to_dataset(samples_file["meta_idx"], metadata_idx)
 
@@ -164,7 +162,6 @@ def add_to_datasets(dataset,
 
 def samples_preparation(in_img_array,
                         label_array,
-                        skel_array,
                         sample_size,
                         overlap,
                         samples_count,
@@ -219,8 +216,6 @@ def samples_preparation(in_img_array,
     added_samples = 0
     excl_samples = 0
 
-    assert skel_array.size == label_array.size, 'Mismatch between label and Skel'
-
     with tqdm(range(0, h, dist_samples), position=1, leave=True,
               desc=f'Writing samples. Dataset currently contains {idx_samples} '
                    f'samples') as _tqdm:
@@ -229,7 +224,6 @@ def samples_preparation(in_img_array,
             for column in range(0, w, dist_samples):
                 data = (in_img_array[row:row + sample_size, column:column + sample_size, :])
                 target = np.squeeze(label_array[row:row + sample_size, column:column + sample_size, :], axis=2)
-                skel = np.squeeze(skel_array[row:row + sample_size, column:column + sample_size, :], axis=2)
                 data_row = data.shape[0]
                 data_col = data.shape[1]
                 if data_row < sample_size or data_col < sample_size:
@@ -243,7 +237,6 @@ def samples_preparation(in_img_array,
                     padding = pad_diff(target_row, target_col, sample_size,
                                        sample_size)  # array, actual height, actual width, desired size
                     target = pad(target, padding, fill=0)
-                    skel = pad(skel, padding, fill=0)
                 u, count = np.unique(target, return_counts=True)
                 print('class:', u, 'count:', count)
                 target_background_percent = round(count[0] / np.sum(count) * 100 if 0 in u else 0, 1)
@@ -259,7 +252,6 @@ def samples_preparation(in_img_array,
                                           val_sample_file=val_sample_file,
                                           data=data,
                                           target=target,
-                                          skel=skel,
                                           sample_metadata=sample_metadata,
                                           metadata_idx=metadata_idx,
                                           dict_classes=pixel_classes)
@@ -425,7 +417,7 @@ def main(params):
                                                        out_shape=np_input_image.shape[:2],
                                                        attribute_name=info['attribute_name'],
                                                        fill=background_val,
-                                                       target_ids=[3, '3'],
+                                                       target_ids=[1, '1'],
                                                        merge_all=True,
                                                        )  # background value in rasterized vector.
 
@@ -435,7 +427,7 @@ def main(params):
                     # if dataset_nodata is not None:
                         # 3. Set ignore_index value in label array where nodata in raster (only if nodata across all bands)
                     # np_label_raster[dataset_nodata] = dontcare
-                    np_label_raster = np.where(np_label_raster == 3, 1, np_label_raster)
+                    np_label_raster = np.where(np_label_raster == 1, 1, np_label_raster)
 
                 if debug:
                     out_meta = raster.meta.copy()
@@ -481,12 +473,9 @@ def main(params):
                                                      if count > 0}  # TODO: add this to add_metadata_from[...] function?
 
                 np_label_raster = np.reshape(np_label_raster, (np_label_raster.shape[0], np_label_raster.shape[1], 1))
-                np_skel_image = opencv_skelitonize(np_label_raster)
-
                 # 3. Prepare samples!
                 number_samples, number_classes = samples_preparation(in_img_array=np_input_image,
                                                                      label_array=np_label_raster,
-                                                                     skel_array=np_skel_image,
                                                                      sample_size=samples_size,
                                                                      overlap=overlap,
                                                                      samples_count=number_samples,

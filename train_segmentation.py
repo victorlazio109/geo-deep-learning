@@ -275,8 +275,6 @@ def train(train_loader,
 
             inputs = data['sat_img'].to(device)
             labels = data['map_img'].to(device)
-            l_skel = data['skel_img'].to(device)
-            # print('l_skel', np.unique(l_skel.detach().cpu().numpy()))
 
             if inputs.shape[1] == 4 and any("module.modelNIR" in s for s in model.state_dict().keys()):
                 ############################
@@ -294,7 +292,7 @@ def train(train_loader,
 
             # forward
             optimizer.zero_grad()
-            outputs, outputs_seg = model(inputs)
+            outputs = model(inputs)
             # added for torchvision models that output an OrderedDict with outputs in 'out' key.
             # More info: https://pytorch.org/hub/pytorch_vision_deeplabv3_resnet101/
             if isinstance(outputs, OrderedDict):
@@ -322,7 +320,7 @@ def train(train_loader,
             # print('outputs_shape', outputs.shape, 'outputs_type', outputs.type())
             # print('labels_shape', labels.shape, 'labels_type', labels.type())
 
-            loss = criterion(outputs, labels, l_skel, outputs_seg)
+            loss = criterion(outputs, labels)
 
             train_metrics['loss'].update(loss.item(), batch_size)
             # print('label_vals', np.unique(labels.detach().cpu().numpy()))
@@ -375,7 +373,6 @@ def evaluation(eval_loader, model, criterion, num_classes, batch_size, ep_idx, p
             with torch.no_grad():
                 inputs = data['sat_img'].to(device)
                 labels = data['map_img'].to(device)
-                l_skel = data['skel_img'].to(device)
                 labels_flatten = flatten_labels(labels)
 
                 if inputs.shape[1] == 4 and any("module.modelNIR" in s for s in model.state_dict().keys()):
@@ -413,8 +410,7 @@ def evaluation(eval_loader, model, criterion, num_classes, batch_size, ep_idx, p
                 outputs_flatten = flatten_outputs(outputs, num_classes)
                 # labels = F.one_hot(labels, num_classes).permute(0, 3, 1, 2)
 
-                # loss = criterion(outputs, labels)
-                loss = criterion(outputs, labels, l_skel, outputs_seg)
+                loss = criterion(outputs, labels)
 
                 eval_metrics['loss'].update(loss.item(), batch_size)
 
@@ -495,7 +491,7 @@ def main(params, config_path):
 
     # mlflow tracking path + parameters logging
     set_tracking_uri(get_key_def('mlflow_uri', params['global'], default="./mlruns"))
-    set_experiment('gdl_road-training')
+    set_experiment('gdl_vegetation-training')
     log_params(params['training'])
     log_params(params['global'])
     log_params(params['sample'])

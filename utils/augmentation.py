@@ -82,11 +82,13 @@ def compose_transforms(params, dataset, type='', ignore_index=None):
             lst_trans.append(BgrToRgb(input_space))
 
         if scale:
-            lst_trans.append(Scale(scale))  # TODO: assert coherence with below normalization
+            pass
+            # lst_trans.append(Scale(scale))  # TODO: assert coherence with below normalization
 
         if norm_mean and norm_std:
-            lst_trans.append(Normalize(mean=params['training']['normalization']['mean'],
-                                       std=params['training']['normalization']['std']))
+            pass
+            # lst_trans.append(Normalize(mean=params['training']['normalization']['mean'],
+            #                            std=params['training']['normalization']['std']))
 
         lst_trans.append(ToTensorTarget(
             num_classes=params['global']['num_classes']))  # Send channels first, convert numpy array to torch tensor
@@ -212,10 +214,10 @@ class GeometricScale(object):
         output_height =  sample['sat_img'].shape[1] * scale_factor
         sat_img = transform.resize(sample['sat_img'], output_shape=(output_height, output_width))
         map_img = transform.resize(sample['map_img'], output_shape=(output_height, output_width))
-        skel_img = transform.resize(sample['skel_img'], output_shape=(output_height, output_width))
+        # skel_img = transform.resize(sample['skel_img'], output_shape=(output_height, output_width))
         sample['sat_img'] = sat_img
         sample['map_img'] = map_img
-        sample['skel_img'] = skel_img
+        # sample['skel_img'] = skel_img
         return sample
 
 
@@ -231,10 +233,10 @@ class RandomRotationTarget(object):
             angle = np.random.uniform(-self.limit, self.limit)
             sat_img = transform.rotate(sample['sat_img'], angle, preserve_range=True, cval=np.nan)
             map_img = transform.rotate(sample['map_img'], angle, preserve_range=True, order=0, cval=self.ignore_index)
-            skel_img = transform.rotate(sample['skel_img'], angle, preserve_range=True, order=0, cval=self.ignore_index)
+            # skel_img = transform.rotate(sample['skel_img'], angle, preserve_range=True, order=0, cval=self.ignore_index)
             sample['sat_img'] = sat_img
             sample['map_img'] = map_img
-            sample['skel_img'] = skel_img
+            # sample['skel_img'] = skel_img
             return sample
         else:
             return sample
@@ -249,10 +251,10 @@ class HorizontalFlip(object):
         if random.random() < self.prob:
             sat_img = np.ascontiguousarray(sample['sat_img'][:, ::-1, ...])
             map_img = np.ascontiguousarray(sample['map_img'][:, ::-1, ...])
-            skel_img = np.ascontiguousarray(sample['skel_img'][:, ::-1, ...])
+            # skel_img = np.ascontiguousarray(sample['skel_img'][:, ::-1, ...])
             sample['sat_img'] = sat_img
             sample['map_img'] = map_img
-            sample['skel_img'] = skel_img
+            # sample['skel_img'] = skel_img
         return sample
 
 
@@ -301,12 +303,12 @@ class RandomCrop(object):
         """
         sat_img = sample['sat_img']
         map_img = sample['map_img']
-        skel_img = sample['skel_img']
+        # skel_img = sample['skel_img']
 
         if self.padding is not None:
             sat_img = pad(sat_img, self.padding, np.nan)  # Pad with nan values for sat_img
             map_img = pad(map_img, self.padding, self.ignore_index)  # Pad with dontcare values for map_img
-            skel_img = pad(map_img, self.padding, self.ignore_index)
+            # skel_img = pad(map_img, self.padding, self.ignore_index)
 
         # pad the height if needed
         if self.pad_if_needed and sat_img.shape[0] < self.size[0]:
@@ -323,21 +325,21 @@ class RandomCrop(object):
             map_img = pad(map_img, (self.size[1] - map_img.shape[1], 0), self.ignore_index)
 
         # pad the height if needed
-        if self.pad_if_needed and skel_img.shape[0] < self.size[0]:
-            skel_img = pad(skel_img, (0, self.size[0] - skel_img.shape[0]), self.ignore_index)
+        # if self.pad_if_needed and skel_img.shape[0] < self.size[0]:
+        #     skel_img = pad(skel_img, (0, self.size[0] - skel_img.shape[0]), self.ignore_index)
         # pad the width if needed
-        if self.pad_if_needed and skel_img.shape[1] < self.size[1]:
-            skel_img = pad(skel_img, (self.size[1] - skel_img.shape[1], 0), self.ignore_index)
+        # if self.pad_if_needed and skel_img.shape[1] < self.size[1]:
+        #     skel_img = pad(skel_img, (self.size[1] - skel_img.shape[1], 0), self.ignore_index)
 
         i, j, h, w = self.get_params(sat_img, self.size)
 
         sat_img = sat_img[i:i + h, j:j + w]
         map_img = map_img[i:i + h, j:j + w]
-        skel_img = skel_img[i:i + h, j:j + w]
+        # skel_img = skel_img[i:i + h, j:j + w]
 
         sample['sat_img'] = sat_img
         sample['map_img'] = map_img
-        sample['skel_img'] = skel_img
+        # sample['skel_img'] = skel_img
         return sample
 
     def __repr__(self):
@@ -366,6 +368,9 @@ class BgrToRgb(object):
 
     def __call__(self, sample):
         sat_img = BGR_to_RGB(sample['sat_img']) if self.bgr_to_rgb else sample['sat_img']
+        sat_img = 2.5 * ((sat_img[:, :, -1] / 10000 - sat_img[:, : 0] / 10000) / (sat_img[:, :, -1] / 10000 + 6 *
+                                                                                  sat_img[:, : 0] / 10000 - 7.5 *
+                                                                                  sat_img[:, : 2] / 10000 + 1))
         sample['sat_img'] = sat_img
 
         return sample
@@ -383,13 +388,13 @@ class ToTensorTarget(object):
         sat_img = torch.from_numpy(sat_img)
 
         map_img = None
-        skel_img = None
+        # skel_img = None
         if 'map_img' in sample.keys():
             if sample['map_img'] is not None:  # This can also be used in inference.
                 map_img = np.int64(sample['map_img'])
-                skel_img = np.int64(sample['skel_img'])
+                # skel_img = np.int64(sample['skel_img'])
                 map_img[map_img > self.num_classes] = 0
-                skel_img[skel_img > self.num_classes] = 0
+                # skel_img[skel_img > self.num_classes] = 0
                 map_img = torch.from_numpy(map_img)
-                skel_img = torch.from_numpy(skel_img)
-        return {'sat_img': sat_img, 'map_img': map_img, 'skel_img': skel_img}
+                # skel_img = torch.from_numpy(skel_img)
+        return {'sat_img': sat_img, 'map_img': map_img}

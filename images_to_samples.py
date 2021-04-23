@@ -345,7 +345,7 @@ def main(params):
     # VALIDATION: (1) Assert num_classes parameters == num actual classes in gpkg and (2) check CRS match (tif and gpkg)
     valid_gpkg_set = set()
     for info in tqdm(list_data_prep, position=0):
-        assert_num_bands(info['tif'], num_bands, meta_map)
+        # assert_num_bands(info['tif'], num_bands, meta_map)
         if info['gpkg'] not in valid_gpkg_set:
             gpkg_classes = validate_num_classes(info['gpkg'], params['global']['num_classes'], info['attribute_name'],
                                                 ignore_index)

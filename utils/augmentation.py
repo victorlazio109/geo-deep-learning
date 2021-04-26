@@ -371,6 +371,7 @@ class BgrToRgb(object):
         sat_img = 2.5 * ((sat_img[:, :, -1] / 10000 - sat_img[:, :, 0] / 10000) / (sat_img[:, :, -1] / 10000 + 6 *
                                                                                    sat_img[:, :, 0] / 10000 - 7.5 *
                                                                                    sat_img[:, :, 2] / 10000 + 1))
+        sat_img = sat_img[:, :, np.newaxis]
         sample['sat_img'] = sat_img
 
         return sample

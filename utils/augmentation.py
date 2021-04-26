@@ -368,9 +368,9 @@ class BgrToRgb(object):
 
     def __call__(self, sample):
         sat_img = BGR_to_RGB(sample['sat_img']) if self.bgr_to_rgb else sample['sat_img']
-        sat_img = 2.5 * ((sat_img[:, :, -1] / 10000 - sat_img[:, : 0] / 10000) / (sat_img[:, :, -1] / 10000 + 6 *
-                                                                                  sat_img[:, : 0] / 10000 - 7.5 *
-                                                                                  sat_img[:, : 2] / 10000 + 1))
+        sat_img = 2.5 * ((sat_img[:, :, -1] / 10000 - sat_img[:, :, 0] / 10000) / (sat_img[:, :, -1] / 10000 + 6 *
+                                                                                   sat_img[:, :, 0] / 10000 - 7.5 *
+                                                                                   sat_img[:, :, 2] / 10000 + 1))
         sample['sat_img'] = sat_img
 
         return sample

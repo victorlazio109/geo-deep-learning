@@ -90,7 +90,8 @@ def set_hyperparameters(params, num_classes, model, checkpoint, dontcare_val):
 def net(net_params, num_channels, inference=False):
     """Define the neural net"""
     model_name = net_params['global']['model_name'].lower()
-    num_bands = int(net_params['global']['number_of_bands'])
+    # num_bands = int(net_params['global']['number_of_bands'])
+    num_bands = 1
     msg = f'Number of bands specified incompatible with this model. Requires 3 band data.'
     train_state_dict_path = get_key_def('state_dict_path', net_params['training'], None)
     pretrained = get_key_def('pretrained', net_params['training'], True) if not inference else False

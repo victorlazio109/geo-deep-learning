@@ -218,7 +218,7 @@ def vis_from_dataloader(params, eval_loader, model, ep_num, output_path, dataset
                     inputs = data['sat_img'].to(device)
                     labels = data['map_img'].to(device)
 
-                    outputs, _ = model(inputs)
+                    outputs = model(inputs)
                     print('label_vals_vis', np.unique(labels.detach().cpu().numpy()))
                     print('out_vals_vis', np.unique(outputs[0].argmax(dim=0).detach().cpu().numpy()))
                     if isinstance(outputs, OrderedDict):
@@ -389,7 +389,7 @@ def evaluation(eval_loader, model, criterion, num_classes, batch_size, ep_idx, p
                     # Test Implementation of the NIR
                     ############################
 
-                outputs, outputs_seg = model(inputs)
+                outputs = model(inputs)
                 if isinstance(outputs, OrderedDict):
                     outputs = outputs['out']
 

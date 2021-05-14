@@ -3,6 +3,7 @@
 # augmentations (ex.: changing hue, saturation, brightness, contrast) may give undesired results.
 # Scaling process is done in images_to_samples.py l.215
 import numbers
+import math
 import warnings
 from typing import Sequence
 
@@ -13,7 +14,8 @@ import random
 import numpy as np
 from skimage import transform, exposure
 from torchvision import transforms
-
+from torch import nn
+from torch.nn import functional as F
 from utils.utils import get_key_def, pad, minmax_scale, BGR_to_RGB
 
 
@@ -82,13 +84,12 @@ def compose_transforms(params, dataset, type='', ignore_index=None):
             lst_trans.append(BgrToRgb(input_space))
 
         if scale:
-            pass
             # lst_trans.append(Scale(scale))  # TODO: assert coherence with below normalization
+            lst_trans.append(VegetationIndex())
 
         if norm_mean and norm_std:
-            pass
-            # lst_trans.append(Normalize(mean=params['training']['normalization']['mean'],
-            #                            std=params['training']['normalization']['std']))
+            lst_trans.append(Normalize(mean=params['training']['normalization']['mean'],
+                                       std=params['training']['normalization']['std']))
 
         lst_trans.append(ToTensorTarget(
             num_classes=params['global']['num_classes']))  # Send channels first, convert numpy array to torch tensor
@@ -230,7 +231,7 @@ class RandomRotationTarget(object):
 
     def __call__(self, sample):
         if random.random() < self.prob:
-            angle = np.random.uniform(-self.limit, self.limit)
+            angle = np.random.choice([90, 180, 270])
             sat_img = transform.rotate(sample['sat_img'], angle, preserve_range=True, cval=np.nan)
             map_img = transform.rotate(sample['map_img'], angle, preserve_range=True, order=0, cval=self.ignore_index)
             # skel_img = transform.rotate(sample['skel_img'], angle, preserve_range=True, order=0, cval=self.ignore_index)
@@ -368,11 +369,34 @@ class BgrToRgb(object):
 
     def __call__(self, sample):
         sat_img = BGR_to_RGB(sample['sat_img']) if self.bgr_to_rgb else sample['sat_img']
-        sat_img = 2.5 * ((sat_img[:, :, -1] / 10000 - sat_img[:, :, 0] / 10000) / (sat_img[:, :, -1] / 10000 + 6 *
-                                                                                   sat_img[:, :, 0] / 10000 - 7.5 *
-                                                                                   sat_img[:, :, 2] / 10000 + 1))
-        sat_img = sat_img[:, :, np.newaxis]
         sample['sat_img'] = sat_img
+
+        return sample
+
+
+class VegetationIndex(object):
+    """Normalize Image with Mean and STD and similar to Pytorch(transform.Normalize) function """
+
+    def __init__(self):
+        pass
+
+    def __call__(self, sample):
+        sat_img = sample['sat_img']
+        R = sat_img[:, :, 0]
+        # G = sat_img[:, :, 1]
+        B = sat_img[:, :, 2]
+        N = sat_img[:, :, -1]
+        with np.errstate(divide='ignore', invalid='ignore'):
+            ndvi = (N / 10000 - R / 10000) / (N / 10000 + R / 10000)
+            # tdvi = 1.5 * ((N - R) / np.sqrt(N ** 2.0 + R + 0.5))
+            # evi = 2.5 * (N - R) / (N + 6*R - 7.5*B + 1)
+
+            evi = 2.5 * ((N / 10000 - R / 10000) / (N / 10000 + 6 * R / 10000 - 7.5 * B / 10000 + 1))
+
+        sample['sat_img'] = minmax_scale(img=sat_img, orig_range=(0, 255), scale_range=(0, 1))
+        # sample['sat_img'] = np.concatenate((sample['sat_img'], evi[:, :, np.newaxis]), axis=-1)
+        sample['sat_img'] = np.concatenate((sample['sat_img'], ndvi[:, :, np.newaxis], evi[:, :, np.newaxis]), axis=-1)
+        # print(sample['sat_img'].shape)
 
         return sample
 
@@ -399,3 +423,70 @@ class ToTensorTarget(object):
                 map_img = torch.from_numpy(map_img)
                 # skel_img = torch.from_numpy(skel_img)
         return {'sat_img': sat_img, 'map_img': map_img}
+
+
+class GaussianSmoothing(nn.Module):
+    """
+    Apply gaussian smoothing on a
+    1d, 2d or 3d tensor. Filtering is performed seperately for each channel
+    in the input using a depthwise convolution.
+    Arguments:
+        channels (int, sequence): Number of channels of the input tensors. Output will
+            have this number of channels as well.
+        kernel_size (int, sequence): Size of the gaussian kernel.
+        sigma (float, sequence): Standard deviation of the gaussian kernel.
+        dim (int, optional): The number of dimensions of the data.
+            Default value is 2 (spatial).
+    """
+
+    def __init__(self, channels, kernel_size, sigma, dim=2):
+        super(GaussianSmoothing, self).__init__()
+        if isinstance(kernel_size, numbers.Number):
+            kernel_size = [kernel_size] * dim
+        if isinstance(sigma, numbers.Number):
+            sigma = [sigma] * dim
+
+        # The gaussian kernel is the product of the
+        # gaussian function of each dimension.
+        kernel = 1
+        meshgrids = torch.meshgrid(
+            [
+                torch.arange(size, dtype=torch.float32)
+                for size in kernel_size
+            ]
+        )
+        for size, std, mgrid in zip(kernel_size, sigma, meshgrids):
+            mean = (size - 1) / 2
+            kernel *= 1 / (std * math.sqrt(2 * math.pi)) * \
+                      torch.exp(-((mgrid - mean) / std) ** 2 / 2)
+
+        # Make sure sum of values in gaussian kernel equals 1.
+        kernel = kernel / torch.sum(kernel)
+
+        # Reshape to depthwise convolutional weight
+        kernel = kernel.view(1, 1, *kernel.size())
+        kernel = kernel.repeat(channels, *[1] * (kernel.dim() - 1))
+
+        self.register_buffer('weight', kernel)
+        self.groups = channels
+
+        if dim == 1:
+            self.conv = F.conv1d
+        elif dim == 2:
+            self.conv = F.conv2d
+        elif dim == 3:
+            self.conv = F.conv3d
+        else:
+            raise RuntimeError(
+                'Only 1, 2 and 3 dimensions are supported. Received {}.'.format(dim)
+            )
+
+    def forward(self, input):
+        """
+        Apply gaussian filter to input.
+        Arguments:
+            input (torch.Tensor): Input to apply gaussian filter on.
+        Returns:
+            filtered (torch.Tensor): Filtered output.
+        """
+        return self.conv(input, weight=self.weight, groups=self.groups)

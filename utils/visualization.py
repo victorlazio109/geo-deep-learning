@@ -104,7 +104,7 @@ def vis(params, input_, output, vis_path, sample_num=0, label=None, dataset='', 
 
     # TODO: Temporary fix, need to be discuss, `input_` is a list if the initial input as NIR with the RGB at [0].
     # The `squeeze` fonction cut the useless dimension, append in inference.
-    # input_ = np.squeeze(input_[0]) if type(input_) is list else np.squeeze(input_)
+    input_ = np.squeeze(input_[0]) if type(input_) is list else np.squeeze(input_)
 
     assert vis_path.parent.is_dir()
     vis_path.mkdir(exist_ok=True)
@@ -133,8 +133,9 @@ def vis(params, input_, output, vis_path, sample_num=0, label=None, dataset='', 
         input_ = np.squeeze(input_)
     elif input_.shape[2] >= 3:
         input_ = input_[:, :, :3]  # take three first bands assuming they are RGB in correct order
-    # mode = 'L' if input_.shape[2] == 1 else 'RGB' # https://pillow.readthedocs.io/en/3.1.x/handbook/concepts.html#concept-modes
-    input_PIL = Image.fromarray(input_.astype(np.uint8), mode='L')  # TODO: test this with grayscale input.
+    mode = 'L' if input_.shape[
+                      2] == 1 else 'RGB'  # https://pillow.readthedocs.io/en/3.1.x/handbook/concepts.html#concept-modes
+    input_PIL = Image.fromarray(input_.astype(np.uint8), mode=mode)  # TODO: test this with grayscale input.
 
     # Give value of class to band with highest value in final inference
     output_argmax = np.argmax(output, axis=2).astype(np.uint8)  # Flatten along channels axis. Convert to 8bit

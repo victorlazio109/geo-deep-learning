@@ -91,7 +91,7 @@ def net(net_params, num_channels, inference=False):
     """Define the neural net"""
     model_name = net_params['global']['model_name'].lower()
     # num_bands = int(net_params['global']['number_of_bands'])
-    num_bands = 1
+    num_bands = 6
     msg = f'Number of bands specified incompatible with this model. Requires 3 band data.'
     train_state_dict_path = get_key_def('state_dict_path', net_params['training'], None)
     pretrained = get_key_def('pretrained', net_params['training'], True) if not inference else False
@@ -188,6 +188,14 @@ def net(net_params, num_channels, inference=False):
             in_channels=num_bands,
             classes=num_channels,
             activation=None)
+    elif model_name == 'unet_pretrained+':
+        model = smp.Unet(
+            encoder_name="resnext101_32x4d",
+            encoder_weights="swsl",
+            encoder_depth=5,
+            in_channels=num_bands,
+            classes=num_channels,
+            activation=None)
     elif model_name == 'fpn_pretrained':
         model = smp.FPN(
             encoder_name="se_resnext101_32x4d",
@@ -206,7 +214,7 @@ def net(net_params, num_channels, inference=False):
             activation=None)
     elif model_name == 'deeplabv3+_pretrained':
         model = smp.DeepLabV3Plus(
-            encoder_name="resnext50_32x4d",
+            encoder_name="resnet101",
             encoder_weights="imagenet",
             in_channels=num_bands,
             classes=num_channels,

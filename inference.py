@@ -24,11 +24,11 @@ from models.model_choice import net, load_checkpoint
 from utils import augmentation
 from utils.geoutils import vector_to_raster
 from utils.utils import load_from_checkpoint, get_device_ids, get_key_def, \
-    list_input_images, pad, add_metadata_from_raster_to_sample, _window_2D
+    list_input_images, add_metadata_from_raster_to_sample, _window_2D
 from utils.readers import read_parameters, image_reader_as_array
 from utils.verifications import add_background_to_num_class
 from mlflow import log_params, set_tracking_uri, set_experiment, start_run, log_artifact, log_metrics
-
+import re
 try:
     import boto3
 except ModuleNotFoundError:
@@ -36,16 +36,19 @@ except ModuleNotFoundError:
 
 
 @torch.no_grad()
-def segmentation(img_array, input_image, label_arr, num_classes, gpkg_name, model, sample_size, num_bands, device):
+def segmentation(img_array, input_image, label_arr, num_classes, gpkg_name, model, sample_size, num_bands, device,
+                 working_folder):
 
     # switch to evaluate mode
     model.eval()
-    transforms = tta.Compose([tta.HorizontalFlip(), ])
+    # transforms = tta.Compose([tta.HorizontalFlip(), tta.Rotate90([270])])
+    transforms = tta.Compose([])
 
     WINDOW_SPLINE_2D = _window_2D(window_size=sample_size, power=2.0)
     WINDOW_SPLINE_2D = torch.as_tensor(np.moveaxis(WINDOW_SPLINE_2D, 2, 0), ).type(torch.float)
     WINDOW_SPLINE_2D = WINDOW_SPLINE_2D.to(device)
-
+    smoothing = augmentation.GaussianSmoothing(2, 5, 8.0)
+    smoothing = smoothing.to(device)
 
     metadata = add_metadata_from_raster_to_sample(img_array,
                                                   input_image,
@@ -71,8 +74,15 @@ def segmentation(img_array, input_image, label_arr, num_classes, gpkg_name, mode
                 o_band = img_array[:, :, x_bands[0]:x_bands[i]]
             img_array = np.append(img_array, o_band, axis=2)
     padding = int(round(sample_size * (1 - 1.0 / 2.0)))
+    pad_left = pad_right = pad_top = pad_bottom = padding
+    # img_array = pad(img_array, padding=padding, fill=np.nan)
+    # RGB image
+    if len(img_array.shape) == 3:
+        img_array = np.pad(img_array, ((pad_top, pad_bottom), (pad_left, pad_right), (0, 0)), mode='reflect')
+    # Grayscale image
+    elif len(img_array.shape) == 2:
+        img_array = np.pad(img_array, ((pad_top, pad_bottom), (pad_left, pad_right)), mode='reflect')
     step = int(sample_size / 2.0)
-    img_array = pad(img_array, padding=padding, fill=np.nan)
     h_, w_, bands_ = img_array.shape
     mx = sample_size * xres
     my = sample_size * yres
@@ -122,6 +132,9 @@ def segmentation(img_array, input_image, label_arr, num_classes, gpkg_name, mode
                     output_lst.append(deaugmented_output)
                 outputs = torch.stack(output_lst)
                 outputs = torch.mul(outputs, WINDOW_SPLINE_2D)
+                outputs = F.pad(outputs, (2, 2, 2, 2), mode='reflect')
+                outputs = smoothing(outputs)
+                # print(outputs.shape)
                 outputs, _ = torch.max(outputs, dim=0)
                 outputs = outputs.permute(1, 2, 0).argmax(dim=-1)
                 outputs = outputs.reshape(sample_size, sample_size).cpu().numpy()
@@ -271,7 +284,7 @@ def main(params: dict):
 
     # mlflow tracking path + parameters logging
     set_tracking_uri(get_key_def('mlflow_uri', params['global'], default="./mlruns"))
-    set_experiment('gdl_road-benchmarking/' + working_folder.name)
+    set_experiment('gdl_veg-benchmarking/' + working_folder.name)
     # log_params(params['global'])
     log_params(params['inference'])
 
@@ -333,13 +346,13 @@ def main(params: dict):
                                                  out_shape=(inf_meta['height'], inf_meta['width']),
                                                  attribute_name=info['attribute_name'],
                                                  fill=0,
-                                                 target_ids=[3, '3'],
+                                                 target_ids=[1, '1'],
                                                  merge_all=True)  # background value in rasterized vector.
 
-                        label = np.where(label == 3, 1, label)
+                        label = np.where(label == 1, 1, label)
 
                     pred, gdf = segmentation(img_array, raster, label, num_classes_corrected,
-                                             gpkg_name, model, chunk_size, num_bands, device)
+                                             gpkg_name, model, chunk_size, num_bands, device, working_folder)
                     if gdf is not None:
                         # print('gdf is not none')
                         gdf_.append(gdf)
@@ -362,7 +375,7 @@ def main(params: dict):
             all_gdf = pd.concat(gdf_)  # Concatenate all geo data frame into one geo data frame
             all_gdf.reset_index(drop=True, inplace=True)
             gdf_x = gpd.GeoDataFrame(all_gdf)
-            gdf_x.to_file(working_folder.joinpath("road_benchmark.gpkg"), driver="GPKG", index=False)
+            gdf_x.to_file(working_folder.joinpath("veg_temp_benchmark.gpkg"), driver="GPKG", index=False)
         # log_artifact(working_folder)
     time_elapsed = time.time() - since
     print('Inference and Benchmarking completed in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))

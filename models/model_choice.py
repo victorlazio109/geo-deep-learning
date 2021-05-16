@@ -12,7 +12,7 @@ from tqdm import tqdm
 from utils.optimizer import create_optimizer
 from losses import MultiClassCriterion
 import torch.optim as optim
-from models import TernausNet, unet, checkpointed_unet, RNet, inception, coordconv, common
+from models import TernausNet, unet, checkpointed_unet, RNet, inception, coordconv
 from utils.utils import load_from_checkpoint, get_device_ids, get_key_def
 
 
@@ -90,8 +90,8 @@ def set_hyperparameters(params, num_classes, model, checkpoint, dontcare_val):
 def net(net_params, num_channels, inference=False):
     """Define the neural net"""
     model_name = net_params['global']['model_name'].lower()
-    # num_bands = int(net_params['global']['number_of_bands'])
-    num_bands = 6
+    num_bands = int(net_params['global']['number_of_bands'])
+    # num_bands = 6
     msg = f'Number of bands specified incompatible with this model. Requires 3 band data.'
     train_state_dict_path = get_key_def('state_dict_path', net_params['training'], None)
     pretrained = get_key_def('pretrained', net_params['training'], True) if not inference else False

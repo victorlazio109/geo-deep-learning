@@ -84,8 +84,8 @@ def compose_transforms(params, dataset, type='', ignore_index=None):
             lst_trans.append(BgrToRgb(input_space))
 
         if scale:
-            # lst_trans.append(Scale(scale))  # TODO: assert coherence with below normalization
-            lst_trans.append(VegetationIndex())
+            lst_trans.append(Scale(scale))  # TODO: assert coherence with below normalization
+            # lst_trans.append(VegetationIndex())
 
         if norm_mean and norm_std:
             lst_trans.append(Normalize(mean=params['training']['normalization']['mean'],

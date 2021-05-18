@@ -126,13 +126,6 @@ def net(net_params, num_channels, inference=False):
         assert num_bands == 3, msg
         model = models.segmentation.fcn_resnet101(pretrained=False, progress=True, num_classes=num_channels,
                                                   aux_loss=None)
-    elif model_name == 'deeplabv3_resnet101_master':
-        assert (num_bands == 3 or num_bands == 4), msg
-        if num_bands == 3:
-            print('Finetuning pretrained deeplabv3 with 3 bands')
-            model = models.segmentation.deeplabv3_resnet101(pretrained=True, progress=True, aux_loss=None)
-            model.classifier = common.DeepLabHead(2048, num_channels)
-            
     elif model_name == 'deeplabv3_resnet101':
         assert (num_bands == 3 or num_bands == 4), msg
         if num_bands == 3:
@@ -190,8 +183,8 @@ def net(net_params, num_channels, inference=False):
             activation=None)
     elif model_name == 'unet_pretrained+':
         model = smp.Unet(
-            encoder_name="resnext101_32x4d",
-            encoder_weights="swsl",
+            encoder_name="resnet18",
+            encoder_weights="imagenet",
             encoder_depth=5,
             in_channels=num_bands,
             classes=num_channels,

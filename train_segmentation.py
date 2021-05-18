@@ -219,11 +219,12 @@ def vis_from_dataloader(params, eval_loader, model, ep_num, output_path, dataset
                     labels = data['map_img'].to(device)
 
                     outputs = model(inputs)
-                    print('label_vals_vis', np.unique(labels.detach().cpu().numpy()))
-                    print('out_vals_vis', np.unique(outputs[0].argmax(dim=0).detach().cpu().numpy()))
+                    # print('label_vals_vis', np.unique(labels.detach().cpu().numpy()))
+                    # print(outputs)
+                    # print('out_vals_vis', np.unique(outputs.argmax(dim=0).detach().cpu().numpy()))
                     if isinstance(outputs, OrderedDict):
                         outputs = outputs['out']
-                        print('out_vals_vis_dict', np.unique(outputs[0].argmax(dim=0).detach().cpu().numpy()))
+                        # print('out_vals_vis_dict', np.unique(outputs[0].argmax(dim=0).detach().cpu().numpy()))
 
                     vis_from_batch(params, inputs, outputs,
                                    batch_index=batch_index,
@@ -491,7 +492,7 @@ def main(params, config_path):
 
     # mlflow tracking path + parameters logging
     set_tracking_uri(get_key_def('mlflow_uri', params['global'], default="./mlruns"))
-    set_experiment('gdl_vegetation-training')
+    set_experiment('gdl_glacier-training')
     log_params(params['training'])
     log_params(params['global'])
     log_params(params['sample'])

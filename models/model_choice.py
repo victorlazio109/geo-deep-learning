@@ -87,6 +87,7 @@ def set_hyperparameters(params, num_classes, model, checkpoint, dontcare_val):
 
     return model, criterion, optimizer, lr_scheduler
 
+
 def net(net_params, num_channels, inference=False):
     """Define the neural net"""
     model_name = net_params['global']['model_name'].lower()
@@ -177,7 +178,8 @@ def net(net_params, num_channels, inference=False):
         model = smp.Unet(
             encoder_name="resnext50_32x4d",
             encoder_weights="imagenet",
-            encoder_depth=5,
+            encoder_depth=4,
+            decoder_channels=[256, 128, 64, 32],
             in_channels=num_bands,
             classes=num_channels,
             activation=None)

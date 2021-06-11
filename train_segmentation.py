@@ -145,52 +145,12 @@ def get_num_samples(samples_path, params):
                 if i == 'trn':
                     for x in range(num_samples[i]):
                         label = hdf5_file['map_img'][x]
-                        label = np.where(label == 255, 0, label)
                         unique_labels, _ = np.unique(label, return_counts=True)
                         # print('class:', unique_labels, 'count:', _)
                         weights.append(''.join([str(int(i)) for i in unique_labels]))
                         samples_weight = compute_sample_weight('balanced', weights)
 
     return num_samples, samples_weight
-
-
-def set_hyperparameters(params, num_classes, model, checkpoint, dontcare_val):
-    """
-    Function to set hyperparameters based on values provided in yaml config file.
-    Will also set model to GPU, if available.
-    If none provided, default functions values may be used.
-    :param params: (dict) Parameters found in the yaml config file
-    :param num_classes: (int) number of classes for current task
-    :param model: Model loaded from model_choice.py
-    :param checkpoint: (dict) state dict as loaded by model_choice.py
-    :return: model, criterion, optimizer, lr_scheduler, num_gpus
-    """
-    # set mandatory hyperparameters values with those in config file if they exist
-    lr = get_key_def('learning_rate', params['training'], None, "missing mandatory learning rate parameter")
-    weight_decay = get_key_def('weight_decay', params['training'], None, "missing mandatory weight decay parameter")
-    step_size = get_key_def('step_size', params['training'], None, "missing mandatory step size parameter")
-    gamma = get_key_def('gamma', params['training'], None, "missing mandatory gamma parameter")
-
-    # optional hyperparameters. Set to None if not in config file
-    class_weights = torch.tensor(params['training']['class_weights']) if params['training']['class_weights'] else None
-    if params['training']['class_weights']:
-        verify_weights(num_classes, class_weights)
-
-    # Loss function
-    criterion = MultiClassCriterion(loss_type=params['training']['loss_fn'],
-                                    ignore_index=dontcare_val,
-                                    weight=class_weights)
-
-    # Optimizer
-    opt_fn = params['training']['optimizer']
-    optimizer = create_optimizer(params=model.parameters(), mode=opt_fn, base_lr=lr, weight_decay=weight_decay)
-    lr_scheduler = optim.lr_scheduler.StepLR(optimizer=optimizer, step_size=step_size, gamma=gamma)
-
-    if checkpoint:
-        tqdm.write(f'Loading checkpoint...')
-        model, optimizer = load_from_checkpoint(checkpoint, model, optimizer=optimizer)
-
-    return model, criterion, optimizer, lr_scheduler
 
 
 def vis_from_dataloader(params, eval_loader, model, ep_num, output_path, dataset='', device=None, vis_batch_range=None):

@@ -7,7 +7,8 @@ import csv
 import time
 import argparse
 import heapq
-import rasterio
+import rasterio, fiona
+
 from PIL import Image
 import torchvision
 import ttach as tta
@@ -15,8 +16,9 @@ from collections import OrderedDict, defaultdict
 import warnings
 import pandas as pd
 import geopandas as gpd
-
+from fiona.crs import to_string
 from tqdm import tqdm
+from rasterio import features
 from shapely.geometry import Polygon
 from pathlib import Path
 from utils.metrics import ComputePixelMetrics
@@ -28,27 +30,71 @@ from utils.utils import load_from_checkpoint, get_device_ids, get_key_def, \
 from utils.readers import read_parameters, image_reader_as_array
 from utils.verifications import add_background_to_num_class
 from mlflow import log_params, set_tracking_uri, set_experiment, start_run, log_artifact, log_metrics
-import re
+
 try:
     import boto3
 except ModuleNotFoundError:
     pass
 
 
+def ras2vec(raster_file, output_path):
+    # Create a generic polygon schema for the output vector file
+    i = 0
+    feat_schema = {'geometry': 'Polygon',
+                   'properties': OrderedDict([('value', 'int')])
+                   }
+    class_value_domain = set()
+    out_features = []
+
+    print("   - Processing raster file: {}".format(raster_file))
+    with rasterio.open(raster_file, 'r') as src:
+        raster = src.read(1)
+    mask = raster != 0
+    # Vectorize the polygons
+    polygons = features.shapes(raster, mask, transform=src.transform)
+
+    # Create shapely polygon featyres
+    for polygon in polygons:
+        feature = {'geometry': {
+            'type': 'Polygon',
+            'coordinates': None},
+            'properties': OrderedDict([('value', 0)])}
+
+        feature['geometry']['coordinates'] = polygon[0]['coordinates']
+        value = int(polygon[1])  # Pixel value of the class (layer)
+        class_value_domain.add(value)
+        feature['properties']['value'] = value
+        i += 1
+        out_features.append(feature)
+
+    print("   - Writing output vector file: {}".format(output_path))
+    num_layers = list(class_value_domain)  # Number of unique pixel value
+    for num_layer in num_layers:
+        polygons = [feature for feature in out_features if feature['properties']['value'] == num_layer]
+        layer_name = 'vector_' + str(num_layer).rjust(3, '0')
+        print("   - Writing layer: {}".format(layer_name))
+
+        with fiona.open(output_path, 'w',
+                        crs=to_string(src.crs),
+                        layer=layer_name,
+                        schema=feat_schema,
+                        driver='GPKG') as dest:
+            for polygon in polygons:
+                dest.write(polygon)
+    print("")
+    print("Number of features written: {}".format(i))
+
 @torch.no_grad()
-def segmentation(img_array, input_image, label_arr, num_classes, gpkg_name, model, sample_size, num_bands, device,
-                 working_folder):
+def segmentation(img_array, input_image, label_arr, num_classes, gpkg_name, model, sample_size, num_bands, device):
 
     # switch to evaluate mode
     model.eval()
-    # transforms = tta.Compose([tta.HorizontalFlip(), tta.Rotate90([270])])
-    transforms = tta.Compose([])
+    transforms = tta.Compose([tta.HorizontalFlip(), ])
 
-    WINDOW_SPLINE_2D = _window_2D(window_size=sample_size, power=2.0)
+    WINDOW_SPLINE_2D = _window_2D(window_size=sample_size, power=4.0)
     WINDOW_SPLINE_2D = torch.as_tensor(np.moveaxis(WINDOW_SPLINE_2D, 2, 0), ).type(torch.float)
     WINDOW_SPLINE_2D = WINDOW_SPLINE_2D.to(device)
-    smoothing = augmentation.GaussianSmoothing(2, 5, 8.0)
-    smoothing = smoothing.to(device)
+
 
     metadata = add_metadata_from_raster_to_sample(img_array,
                                                   input_image,
@@ -73,16 +119,20 @@ def segmentation(img_array, input_image, label_arr, num_classes, gpkg_name, mode
             if i in x_bands:
                 o_band = img_array[:, :, x_bands[0]:x_bands[i]]
             img_array = np.append(img_array, o_band, axis=2)
-    padding = int(round(sample_size * (1 - 1.0 / 2.0)))
+    padding = int(round(sample_size * (1 - 1.0 / 4.0)))
     pad_left = pad_right = pad_top = pad_bottom = padding
     # img_array = pad(img_array, padding=padding, fill=np.nan)
     # RGB image
     if len(img_array.shape) == 3:
-        img_array = np.pad(img_array, ((pad_top, pad_bottom), (pad_left, pad_right), (0, 0)), mode='reflect')
+        img_array = np.pad(img_array, ((pad_top, pad_bottom), (pad_left, pad_right), (0, 0)),
+                           mode='constant',
+                           constant_values=np.nan)
     # Grayscale image
     elif len(img_array.shape) == 2:
-        img_array = np.pad(img_array, ((pad_top, pad_bottom), (pad_left, pad_right)), mode='reflect')
-    step = int(sample_size / 2.0)
+        img_array = np.pad(img_array, ((pad_top, pad_bottom), (pad_left, pad_right)),
+                           mode='constant',
+                           constant_values=np.nan)
+    step = int(sample_size / 4.0)
     h_, w_, bands_ = img_array.shape
     mx = sample_size * xres
     my = sample_size * yres
@@ -132,9 +182,6 @@ def segmentation(img_array, input_image, label_arr, num_classes, gpkg_name, mode
                     output_lst.append(deaugmented_output)
                 outputs = torch.stack(output_lst)
                 outputs = torch.mul(outputs, WINDOW_SPLINE_2D)
-                outputs = F.pad(outputs, (2, 2, 2, 2), mode='reflect')
-                outputs = smoothing(outputs)
-                # print(outputs.shape)
                 outputs, _ = torch.max(outputs, dim=0)
                 outputs = outputs.permute(1, 2, 0).argmax(dim=-1)
                 outputs = outputs.reshape(sample_size, sample_size).cpu().numpy()
@@ -251,9 +298,9 @@ def main(params: dict):
     task = params['global']['task']
     img_dir_or_csv = params['inference']['img_dir_or_csv_file']
     chunk_size = get_key_def('chunk_size', params['inference'], 512)
+    raster_to_vec = get_key_def('ras2vec', params['inference'], False)
     num_classes = params['global']['num_classes']
     num_classes_corrected = add_background_to_num_class(task, num_classes)
-    # print(num_classes_corrected)
     num_bands = params['global']['number_of_bands']
     working_folder = Path(params['inference']['state_dict_path']).parent.joinpath(f'inference_{num_bands}bands')
     num_devices = params['global']['num_gpus'] if params['global']['num_gpus'] else 0
@@ -284,7 +331,7 @@ def main(params: dict):
 
     # mlflow tracking path + parameters logging
     set_tracking_uri(get_key_def('mlflow_uri', params['global'], default="./mlruns"))
-    set_experiment('gdl_veg-benchmarking/' + working_folder.name)
+    set_experiment('gdl_glacier-benchmarking/' + working_folder.name)
     # log_params(params['global'])
     log_params(params['inference'])
 
@@ -352,9 +399,8 @@ def main(params: dict):
                         label = np.where(label == 1, 1, label)
 
                     pred, gdf = segmentation(img_array, raster, label, num_classes_corrected,
-                                             gpkg_name, model, chunk_size, num_bands, device, working_folder)
+                                             gpkg_name, model, chunk_size, num_bands, device)
                     if gdf is not None:
-                        # print('gdf is not none')
                         gdf_.append(gdf)
                         gpkg_name_.append(gpkg_name)
                     if local_gpkg:
@@ -370,12 +416,18 @@ def main(params: dict):
                                      "dtype": 'uint8'})
                     with rasterio.open(inference_image, 'w+', **inf_meta) as dest:
                         dest.write(pred)
+
+                    if raster_to_vec:
+                        inference_vec = working_folder.joinpath(local_img.parent.name,
+                                                                f"{img_name.split('.')[0]}_inference.gpkg")
+                        ras2vec(inference_image, inference_vec)
+
         if len(gdf_) >= 1:
             assert len(gdf_) == len(gpkg_name_), 'benchmarking unable to complete'
             all_gdf = pd.concat(gdf_)  # Concatenate all geo data frame into one geo data frame
             all_gdf.reset_index(drop=True, inplace=True)
             gdf_x = gpd.GeoDataFrame(all_gdf)
-            gdf_x.to_file(working_folder.joinpath("veg_temp_benchmark.gpkg"), driver="GPKG", index=False)
+            gdf_x.to_file(working_folder.joinpath("glacier_benchmark.gpkg"), driver="GPKG", index=False)
         # log_artifact(working_folder)
     time_elapsed = time.time() - since
     print('Inference and Benchmarking completed in {:.0f}m {:.0f}s'.format(time_elapsed // 60, time_elapsed % 60))

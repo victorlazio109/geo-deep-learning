@@ -331,7 +331,7 @@ def main(params: dict):
 
     # mlflow tracking path + parameters logging
     set_tracking_uri(get_key_def('mlflow_uri', params['global'], default="./mlruns"))
-    set_experiment('gdl_glacier-benchmarking/' + working_folder.name)
+    set_experiment('gdl_landUse-benchmarking/' + working_folder.name)
     # log_params(params['global'])
     log_params(params['inference'])
 
@@ -408,12 +408,12 @@ def main(params: dict):
                             pixelMetrics= ComputePixelMetrics(label, pred, num_classes_corrected)
                             log_metrics(pixelMetrics.update(pixelMetrics.iou))
                             log_metrics(pixelMetrics.update(pixelMetrics.dice))
-                    pred = pred[np.newaxis, :, :].astype(np.uint8)
+                    pred = pred[np.newaxis, :, :].astype(np.uint16)
                     inf_meta.update({"driver": "GTiff",
                                      "height": pred.shape[1],
                                      "width": pred.shape[2],
                                      "count": pred.shape[0],
-                                     "dtype": 'uint8'})
+                                     "dtype": 'uint16'})
                     with rasterio.open(inference_image, 'w+', **inf_meta) as dest:
                         dest.write(pred)
 

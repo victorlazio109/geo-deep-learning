@@ -27,7 +27,7 @@ def validate_num_classes(vector_file: Union[str, Path], num_classes: int, attrib
             # Use property of set to store unique values
             distinct_att.add(get_key_recursive(attribute_name, feature))
 
-    detected_classes = len(distinct_att) - len([ignore_index]) if ignore_index in distinct_att else len(distinct_att)
+    # detected_classes = len(distinct_att) - len([ignore_index]) if ignore_index in distinct_att else len(distinct_att)
 
     # if detected_classes != num_classes:
     #     raise ValueError('The number of classes in the yaml.config {} is different than the number of classes in '

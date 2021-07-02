@@ -417,7 +417,7 @@ def main(params):
                                                        out_shape=np_input_image.shape[:2],
                                                        attribute_name=info['attribute_name'],
                                                        fill=background_val,
-                                                       target_ids=[1, '1'],
+                                                       target_ids=[1, '1', 2, '2'],
                                                        merge_all=True,
                                                        )  # background value in rasterized vector.
 
@@ -427,7 +427,7 @@ def main(params):
                     # if dataset_nodata is not None:
                         # 3. Set ignore_index value in label array where nodata in raster (only if nodata across all bands)
                     # np_label_raster[dataset_nodata] = dontcare
-                    np_label_raster = np.where(np_label_raster == 1, 1, np_label_raster)
+                    # np_label_raster = np.where(np_label_raster == 1, 1, np_label_raster)
 
                 if debug:
                     out_meta = raster.meta.copy()

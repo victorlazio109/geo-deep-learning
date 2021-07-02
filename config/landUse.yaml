@@ -10,10 +10,10 @@
 # Global parameters
 
 global:
-  samples_size: 1024
-  num_classes: 1
-  data_path: /export/sata01/wspace/rgbn_test_runs/Atlass_Glacier/ # /wshare/travail/bdgrid2/EXTRACTION/Deep_learning/GDL_EAU_2019_20/cayouche/
-  number_of_bands: 3
+  samples_size: 224
+  num_classes: 2
+  data_path: /export/sata01/wspace/rgbn_test_runs/landUse/   # /wshare/travail/bdgrid2/EXTRACTION/Deep_learning/GDL_EAU_2019_20/cayouche/
+  number_of_bands: 4
   model_name: unet_pretrained # One of unet, unetsmall, checkpointed_unet, ternausnet, fcn_resnet101, deeplabv3_resnet50,deeplabv3_resnet101
   task: segmentation  # Task to perform. Either segmentation or classification
   num_gpus: 1
@@ -25,7 +25,7 @@ global:
 # Sample parameters; used in images_to_samples.py -------------------
 
 sample:
-  prep_csv_file: /export/sata01/wspace/rgbn_test_runs/Atlass_Glacier/glacier_atlas.csv
+  prep_csv_file: /export/sata01/wspace/rgbn_test_runs/landUse/landUse.csv
   val_percent: 5 # Percentage of validation samples created from train set (0 - 100)
   overlap: 0
   sampling_method:
@@ -36,40 +36,40 @@ sample:
 # Training parameters; used in train_segmentation.py ----------------------
 
 training:
-  state_dict_path: #/export/sata01/wspace/rgbn_test_runs/Atlass_Glacier/archive/samples1024_overlap0_min-annot0_3bands/model/glacier/_2021-05-20_08-32/checkpoint.pth.tar
+  state_dict_path:
   num_trn_samples:
   num_val_samples:
   num_tst_samples:
-  batch_size: 2
+  batch_size: 4
   pretrained: True
-  num_epochs: 100
-  target_size: 512
+  num_epochs: 200
+  target_size: 112
   loss_fn: Dice # One of CrossEntropy, Lovasz, Focal, OhemCrossEntropy (*Lovasz for segmentation tasks only)
   optimizer: adam # One of adam, sgd or adabound
   learning_rate: 1e-4
   weight_decay: 1e-5
   step_size: 35
   gamma: 0.1
-  class_weights: [0.223, 0.777]
+  class_weights: [0.0, 0.9, 0.91]
   batch_metrics:   # (int) Metrics computed every (int) batches. If left blank, will not perform metrics. If (int)=1, metrics computed on all batches.
   ignore_index: -1 # Specifies a target value that is ignored and does not contribute to the input gradient. Default: None
 
   augmentation:
-    rotate_limit: 90
-    rotate_prob: 0.5
-    hflip_prob: 0.5
+    rotate_limit: # 90
+    rotate_prob: # 0.5
+    hflip_prob: # 0.5
     random_radiom_trim_range: # [0,0] # range of values (%) for trimming (same value used for left and right trim)
 
   normalization:
-    mean: [0.485, 0.456, 0.406]
-    std: [0.229, 0.224, 0.225]
+    mean: [0.485, 0.456, 0.406, 1e-6]
+    std: [0.229, 0.224, 0.225, 1e-6]
 
 
 # Inference parameters; used in inference.py --------
 
 inference:
-  img_dir_or_csv_file: /export/sata01/wspace/rgbn_test_runs/Atlass_Glacier/test/
-  state_dict_path: /export/sata01/wspace/rgbn_test_runs/Atlass_Glacier/samples1024_overlap0_min-annot0_3bands/model/glacier/crossEntropy/checkpoint.pth.tar
+  img_dir_or_csv_file: /export/sata01/wspace/rgbn_test_runs/landUse/test/
+  state_dict_path: /export/sata01/wspace/rgbn_test_runs/landUse/samples224_overlap0_min-annot0_4bands/model/landUse/checkpoint.pth.tar
   chunk_size: 2048
   ras2vec: True
 
